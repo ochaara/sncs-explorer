@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Chart from './Chart';
 import NumberField from './NumberField';
+import ProjectPanel from './ProjectPanel';
 import { loadDataset, pick, quantile } from './data';
 import type { Dataset } from './data';
 import { TYPES, classify, countTypes } from './typology';
@@ -186,40 +187,11 @@ function Explorer({ data }: { data: Dataset }) {
               el umbral.
             </p>
           </section>
-
-          <section>
-            <h2>Proyecto seleccionado</h2>
-            {selected === null ? (
-              <p className="muted">Haz clic en un punto del gráfico.</p>
-            ) : (
-              <div className="selected">
-                <div className="ref">{data.ref[selected]}</div>
-                <dl>
-                  <dt>Área</dt>
-                  <dd>{data.areas[data.area[selected]]}</dd>
-                  <dt>Publicaciones</dt>
-                  <dd>{data.n[selected]}</dd>
-                  <dt>SNCS</dt>
-                  <dd>{data.sncs[selected].toFixed(3)}</dd>
-                  <dt>p25</dt>
-                  <dd>{data.p25[selected].toFixed(3)}</dd>
-                  <dt>Desv. estándar</dt>
-                  <dd>{data.std[selected].toFixed(3)}</dd>
-                  <dt>Tipología</dt>
-                  <dd>{TYPES[classify(data, selected, thresholds)].code} con los umbrales actuales</dd>
-                </dl>
-                {!selectedVisible && <p className="muted small">No cumple el filtro actual.</p>}
-                <button type="button" className="link" onClick={() => setSelected(null)}>
-                  Quitar selección
-                </button>
-              </div>
-            )}
-          </section>
         </aside>
 
         <div className="chart-wrap">
           <div className="hint">
-            Rueda o botones: zoom · Arrastrar el fondo: desplazar · Arrastrar las líneas: mover umbrales · Clic: seleccionar
+            Rueda o botones: zoom · Arrastrar el fondo: desplazar · Arrastrar las líneas: mover umbrales · Clic en un punto: ver proyecto y publicaciones
           </div>
           <Chart
             data={data}
@@ -231,6 +203,16 @@ function Explorer({ data }: { data: Dataset }) {
             onSelect={setSelected}
           />
         </div>
+
+        {selected !== null && (
+          <ProjectPanel
+            data={data}
+            index={selected}
+            type={classify(data, selected, thresholds)}
+            visible={selectedVisible}
+            onClose={() => setSelected(null)}
+          />
+        )}
       </main>
     </div>
   );

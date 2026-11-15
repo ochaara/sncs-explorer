@@ -51,6 +51,9 @@ export default function Chart({ data, indices, thresholds, onDragThreshold, sele
     return () => ro.disconnect();
   }, []);
 
+  // Al cambiar el tamaño, el tooltip quedaría desplazado
+  useEffect(() => setHover(null), [size]);
+
   const iw = size.w - M.left - M.right;
   const ih = size.h - M.top - M.bottom;
 

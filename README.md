@@ -12,7 +12,12 @@ Aplicación web interactiva basada en el gráfico de la sección *3.3. Resultado
 - **Cuartiles del estudio.** Por defecto los umbrales son SNCS = 1, Q1(p25) y Q3(desviación), recalculados para el mínimo de publicaciones elegido. Al arrastrar una línea se pasa a umbrales manuales.
 - **Filtros.** Mínimo de publicaciones (1 = todos los proyectos) y área científica.
 - **Zoom y desplazamiento.** Rueda del ratón o botones `+`, `−` y `⟲`; arrastrar el fondo desplaza la vista.
-- **Selección.** Al pasar por encima de un punto se ve su referencia. Al hacer clic se muestra en el panel lateral con sus métricas.
+- **Detalle del proyecto.** Al pasar por encima de un punto se ve su referencia. Al hacer clic se abre un panel con:
+  - las métricas del proyecto;
+  - su título y resumen;
+  - la lista de sus publicaciones, cada una con su título y su resumen desplegable, más un buscador si hay muchas.
+
+  Estos textos se leen de MongoDB a través de la API `/api/project`.
 
 Con un mínimo de 3 publicaciones y los cuartiles del estudio, la app reproduce los resultados del notebook: T1 8 438, T2 73, T3 7 739, T4 1 721 (1 794 alertas).
 
@@ -21,6 +26,15 @@ Con un mínimo de 3 publicaciones y los cuartiles del estudio, la app reproduce 
 - Vite + React + TypeScript, compilado como sitio estático.
 - Puntos dibujados en `<canvas>` (24 203 proyectos); ejes, líneas y selección en SVG.
 - d3-zoom para el zoom y d3-quadtree para localizar el punto bajo el cursor.
+- `api/project.ts`: función serverless de Vercel que consulta MongoDB (colecciones `proyectos` y `publicaciones`). La URL de conexión solo existe en el servidor y nunca llega al navegador. En desarrollo, `vite.config.ts` sirve la misma función.
+
+## Variables de entorno
+
+| Variable | Descripción |
+|---|---|
+| `MONGODB_URI` | URL de conexión a MongoDB, con la base de datos `proyectos` en la ruta |
+
+Para desarrollo local, copia `.env.example` a `.env.local` y pon la URL real. `.env.local` está en `.gitignore` y no se sube al repositorio.
 
 ## Datos
 
@@ -42,12 +56,23 @@ python3 scripts/build_data.py ruta/al/fichero.json
 npm install
 npm run dev       # servidor de desarrollo en http://localhost:5173
 npm run build     # compilación de producción en dist/
-npm run preview   # sirve dist/ en http://localhost:4173
+npm run preview   # sirve dist/ en http://localhost:4173 (sin la API de MongoDB)
 ```
+
+`npm run dev` incluye la API. `npm run preview` solo sirve los archivos estáticos, así que en él el panel de publicaciones dará error. Para probar la versión completa como en Vercel, usa `npx vercel dev`.
 
 ## Despliegue en Vercel
 
-Vercel detecta el proyecto como Vite (`vercel.json` fija `npm run build` y la salida `dist/`).
+Vercel detecta el proyecto como Vite (`vercel.json` fija `npm run build` y la salida `dist/`) y despliega `api/project.ts` como función serverless.
+
+Antes del primer despliegue:
+
+1. **Variable de entorno:** en Vercel, ve a *Project → Settings → Environment Variables* y añade `MONGODB_URI` en *Production* y *Preview*. Si el proyecto ya estaba desplegado, vuelve a desplegarlo para que la recoja.
+2. **Acceso de red en MongoDB Atlas:** las funciones de Vercel no tienen IP fija. En Atlas, ve a *Network Access → Add IP Address* y permite `0.0.0.0/0`, protegido por usuario y contraseña. Usa un usuario de base de datos **solo de lectura** sobre `proyectos`.
+3. **Índice (recomendado):** acelera la búsqueda por referencia:
+   ```js
+   db.proyectos.createIndex({ Referencia: 1 })
+   ```
 
 - **Desde Git:** sube el repositorio a GitHub, GitLab o Bitbucket y en Vercel elige *Add New → Project* e impórtalo.
 - **Desde la terminal:** `npx vercel` (vista previa) y `npx vercel --prod` (producción).
