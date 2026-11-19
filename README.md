@@ -15,7 +15,9 @@ Aplicación web interactiva basada en el gráfico de la sección *3.3. Resultado
 - **Detalle del proyecto.** Al pasar por encima de un punto se ve su referencia. Al hacer clic se abre un panel con:
   - las métricas del proyecto;
   - su título y resumen;
-  - la lista de sus publicaciones, cada una con su título y su resumen desplegable, más un buscador si hay muchas.
+  - la lista de sus publicaciones, cada una con su título, revista, tipo (revista, congreso, serie de libros…) y su resumen desplegable, más un buscador si hay muchas.
+
+  La revista y el tipo se leen de los campos `prism:publicationName` y `prism:aggregationType` de la colección `publicaciones`. Si una publicación no los tiene, simplemente no se muestran.
 
   Estos textos se leen de MongoDB a través de la API `/api/project`.
 

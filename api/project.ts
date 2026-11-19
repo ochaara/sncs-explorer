@@ -15,6 +15,10 @@ export interface Publication {
   id: string;
   title: string | null;
   abstract: string | null;
+  /** Revista o medio de publicación (prism:publicationName) */
+  source: string | null;
+  /** Tipo de publicación (prism:aggregationType), p. ej. "Journal" */
+  type: string | null;
 }
 
 export interface ProjectDetails {
@@ -35,6 +39,8 @@ interface PublicationDoc {
   _id: ObjectId;
   'dc:title'?: string;
   abstract?: string;
+  'prism:publicationName'?: string;
+  'prism:aggregationType'?: string;
 }
 
 // El cliente se reutiliza entre invocaciones de la misma instancia.
@@ -67,7 +73,7 @@ export async function getProject(ref: string): Promise<ProjectDetails | null> {
   const docs = ids.length
     ? await db
         .collection<PublicationDoc>('publicaciones')
-        .find({ _id: { $in: ids } }, { projection: { 'dc:title': 1, abstract: 1 } })
+        .find({ _id: { $in: ids } }, { projection: { 'dc:title': 1, abstract: 1, 'prism:publicationName': 1, 'prism:aggregationType': 1 } })
         .toArray()
     : [];
   const byId = new Map(docs.map((d) => [d._id.toHexString(), d]));
@@ -75,7 +81,13 @@ export async function getProject(ref: string): Promise<ProjectDetails | null> {
   // Se respeta el orden en que el proyecto lista sus publicaciones
   const publications: Publication[] = ids.map((id) => {
     const d = byId.get(id.toHexString());
-    return { id: id.toHexString(), title: clean(d?.['dc:title']), abstract: clean(d?.abstract) };
+    return {
+      id: id.toHexString(),
+      title: clean(d?.['dc:title']),
+      abstract: clean(d?.abstract),
+      source: clean(d?.['prism:publicationName']),
+      type: clean(d?.['prism:aggregationType']),
+    };
   });
 
   return {

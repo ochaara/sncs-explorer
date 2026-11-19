@@ -17,6 +17,16 @@ type State =
   | { status: 'error'; message: string }
   | { status: 'ok'; project: ProjectDetails };
 
+// Traducción de prism:aggregationType
+const TYPE_LABELS: Record<string, string> = {
+  Journal: 'Revista',
+  'Conference Proceeding': 'Congreso',
+  'Book Series': 'Serie de libros',
+  Book: 'Libro',
+  'Trade Journal': 'Revista profesional',
+};
+const typeLabel = (t: string) => TYPE_LABELS[t] ?? t;
+
 // Caché en memoria para no repetir consultas al volver a un proyecto
 const cache = new Map<string, ProjectDetails>();
 
@@ -56,8 +66,19 @@ export default function ProjectPanel({ data, index, type, visible, onClose }: Pr
     const q = query.trim().toLowerCase();
     const all = state.project.publications.map((p, k) => ({ ...p, n: k + 1 }));
     if (!q) return all;
-    return all.filter((p) => `${p.title ?? ''} ${p.abstract ?? ''}`.toLowerCase().includes(q));
+    return all.filter((p) => `${p.title ?? ''} ${p.abstract ?? ''} ${p.source ?? ''}`.toLowerCase().includes(q));
   }, [state, query]);
+
+  // Recuento por tipo de publicación, p. ej. "12 Revista · 2 Congreso"
+  const typeSummary = useMemo(() => {
+    if (state.status !== 'ok') return '';
+    const counts = new Map<string, number>();
+    for (const p of state.project.publications) if (p.type) counts.set(p.type, (counts.get(p.type) ?? 0) + 1);
+    return [...counts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(([t, n]) => `${n} ${typeLabel(t)}`)
+      .join(' · ');
+  }, [state]);
 
   const t = TYPES[type];
 
@@ -115,11 +136,12 @@ export default function ProjectPanel({ data, index, type, visible, onClose }: Pr
                 </button>
               )}
             </div>
+            {typeSummary && <p className="muted small pp-type-summary">{typeSummary}</p>}
             {state.project.publications.length > 8 && (
               <input
                 className="pp-search"
                 type="search"
-                placeholder="Buscar en títulos y resúmenes…"
+                placeholder="Buscar en títulos, resúmenes y revistas…"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
               />
@@ -135,7 +157,15 @@ export default function ProjectPanel({ data, index, type, visible, onClose }: Pr
                   <details open={expandAll}>
                     <summary>
                       <span className="pp-num">{p.n}</span>
-                      <span>{p.title ?? <em className="muted">Sin título</em>}</span>
+                      <span className="pp-pub-main">
+                        <span>{p.title ?? <em className="muted">Sin título</em>}</span>
+                        {(p.source || p.type) && (
+                          <span className="pp-source">
+                            {p.type && <span className="pp-pubtype">{typeLabel(p.type)}</span>}
+                            {p.source && <em>{p.source}</em>}
+                          </span>
+                        )}
+                      </span>
                     </summary>
                     <p className={p.abstract ? '' : 'muted'}>{p.abstract ?? 'Sin resumen disponible.'}</p>
                   </details>

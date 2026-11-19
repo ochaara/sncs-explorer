@@ -585,3 +585,33 @@ table.types .alert-row td {
     z-index: 10;
   }
 }
+
+/* Revista y tipo de cada publicación */
+.pp-pub-main {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.pp-source {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 0.78rem;
+  font-weight: 400;
+  color: var(--muted);
+}
+.pp-pubtype {
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-style: normal;
+}
+.pp-type-summary {
+  margin: 6px 0 0;
+}
