@@ -3,7 +3,7 @@ import type { Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 
 /**
- * En desarrollo (`npm run dev`) sirve /api/project con el mismo código que la
+ * En desarrollo (`npm run dev`) sirve /api/project y /api/search con el mismo código que la
  * función serverless de Vercel, para no necesitar `vercel dev`.
  */
 function devApi(): Plugin {
@@ -11,16 +11,18 @@ function devApi(): Plugin {
     name: 'dev-api',
     apply: 'serve',
     configureServer(server) {
-      server.middlewares.use('/api/project', async (req, res) => {
-        try {
-          const mod = await server.ssrLoadModule('/api/project.ts');
-          await mod.default(req, res);
-        } catch (err) {
-          console.error(err);
-          res.statusCode = 500;
-          res.end(JSON.stringify({ error: String(err) }));
-        }
-      });
+      for (const name of ['project', 'search']) {
+        server.middlewares.use(`/api/${name}`, async (req, res) => {
+          try {
+            const mod = await server.ssrLoadModule(`/api/${name}.ts`);
+            await mod.default(req, res);
+          } catch (err) {
+            console.error(err);
+            res.statusCode = 500;
+            res.end(JSON.stringify({ error: String(err) }));
+          }
+        });
+      }
     },
   };
 }

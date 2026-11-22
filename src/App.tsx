@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Chart from './Chart';
 import NumberField from './NumberField';
 import ProjectPanel from './ProjectPanel';
+import SearchPanel from './SearchPanel';
 import { loadDataset, pick, quantile } from './data';
 import type { Dataset } from './data';
 import { TYPES, classify, countTypes } from './typology';
@@ -32,6 +33,37 @@ function Explorer({ data }: { data: Dataset }) {
   const [mode, setMode] = useState<Mode>('quartiles');
   const [manual, setManual] = useState<Thresholds>({ sncs: 1, p25: 1, std: 0.15, useStd: true });
   const [selected, setSelected] = useState<number | null>(null);
+  const [focus, setFocus] = useState<{ index: number; at: number } | null>(null);
+  // Aviso del buscador cuando cambia el filtro; solo es válido mientras el filtro
+  // y la selección sigan siendo los que dejó el buscador
+  const [notice, setNotice] = useState<{ text: string; index: number; minPubs: number; area: number } | null>(null);
+
+  const refIndex = useMemo(() => new Map(Array.from({ length: data.size }, (_, i) => [data.ref[i], i])), [data]);
+
+  // Proyecto elegido en el buscador: se ajusta el filtro si hace falta, se selecciona y se hace zoom
+  const pickFromSearch = (i: number) => {
+    const changes: string[] = [];
+    if (data.n[i] < minPubs) {
+      setMinPubs(data.n[i]);
+      changes.push(`el mínimo de publicaciones a ${data.n[i]}`);
+    }
+    if (area >= 0 && data.area[i] !== area) {
+      setArea(-1);
+      changes.push('el área a «Todas las áreas»');
+    }
+    setNotice(
+      changes.length
+        ? {
+            text: `Para mostrar ${data.ref[i]} se ha cambiado ${changes.join(' y ')}.`,
+            index: i,
+            minPubs: Math.min(minPubs, data.n[i]),
+            area: area >= 0 && data.area[i] !== area ? -1 : area,
+          }
+        : null,
+    );
+    setSelected(i);
+    setFocus({ index: i, at: Date.now() });
+  };
 
   // Proyectos que cumplen el mínimo de publicaciones (todas las áreas)
   const byPubs = useMemo(() => {
@@ -80,6 +112,11 @@ function Explorer({ data }: { data: Dataset }) {
 
       <main>
         <aside>
+          <SearchPanel data={data} refIndex={refIndex} onPick={pickFromSearch} notice={
+              notice && notice.minPubs === minPubs && notice.area === area && notice.index === selected ? notice.text : null
+            }
+          />
+
           <section>
             <h2>Proyectos</h2>
             <label className="field">
@@ -201,6 +238,7 @@ function Explorer({ data }: { data: Dataset }) {
             selected={selected}
             selectedVisible={selectedVisible}
             onSelect={setSelected}
+            focus={focus}
           />
         </div>
 

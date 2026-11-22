@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent } from 'react';
 import { scaleLinear } from 'd3-scale';
 import { pointer, select } from 'd3-selection';
-import { zoom as d3zoom, zoomIdentity } from 'd3-zoom';
+import { zoom as d3zoom, zoomIdentity, zoomTransform } from 'd3-zoom';
+import 'd3-transition';
 import type { ZoomBehavior, ZoomTransform } from 'd3-zoom';
 import { quadtree } from 'd3-quadtree';
 import type { Dataset } from './data';
@@ -12,6 +13,8 @@ import type { Thresholds } from './typology';
 const M = { top: 20, right: 24, bottom: 52, left: 68 };
 const HIT_RADIUS = 8; // píxeles
 const DRAW_ORDER = [2, 0, 3, 1]; // T3, T1, T4, T2: las alertas quedan encima
+const FOCUS_SCALE = 8; // zoom mínimo al centrar un proyecto buscado
+const FOCUS_WINDOW_MS = 1500; // tras abrir el panel el gráfico cambia de tamaño: se vuelve a centrar
 
 interface Props {
   data: Dataset;
@@ -21,13 +24,24 @@ interface Props {
   selected: number | null;
   selectedVisible: boolean;
   onSelect: (i: number | null) => void;
+  /** Proyecto al que hacer zoom (p. ej. desde el buscador). `at` cambia en cada petición. */
+  focus: { index: number; at: number } | null;
 }
 
 type Axis = 'x' | 'y';
 
 const fmt = (v: number, digits = 3) => v.toFixed(digits);
 
-export default function Chart({ data, indices, thresholds, onDragThreshold, selected, selectedVisible, onSelect }: Props) {
+export default function Chart({
+  data,
+  indices,
+  thresholds,
+  onDragThreshold,
+  selected,
+  selectedVisible,
+  onSelect,
+  focus,
+}: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -133,6 +147,18 @@ export default function Chart({ data, indices, thresholds, onDragThreshold, sele
       select(surfaceRef.current).call(zoomRef.current.transform, zoomIdentity);
     }
   }, [domain]);
+
+  // Zoom animado centrado en el proyecto buscado
+  useEffect(() => {
+    const surface = surfaceRef.current;
+    const z = zoomRef.current;
+    if (!focus || !surface || !z || Date.now() - focus.at > FOCUS_WINDOW_MS) return;
+    const k = Math.max(FOCUS_SCALE, zoomTransform(surface).k);
+    const x = bx(data.sncs[focus.index]);
+    const y = by(data.p25[focus.index]);
+    const target = zoomIdentity.translate(iw / 2 - k * x, ih / 2 - k * y).scale(k);
+    select(surface).transition().duration(800).call(z.transform, target);
+  }, [focus, data, bx, by, iw, ih]);
 
   const zoomBy = (factor: number) => {
     if (surfaceRef.current && zoomRef.current) select(surfaceRef.current).call(zoomRef.current.scaleBy, factor);
@@ -326,6 +352,16 @@ export default function Chart({ data, indices, thresholds, onDragThreshold, sele
 
             {marker(hover, 'hover-ring')}
             {selectedVisible && marker(selected, 'selected-ring')}
+            {focus && focus.index === selected && selectedVisible && (
+              <g
+                key={focus.at}
+                className="focus-pulse"
+                transform={`translate(${zx(data.sncs[focus.index])},${zy(data.p25[focus.index])})`}
+              >
+                <circle r={8} />
+                <circle r={8} className="delayed" />
+              </g>
+            )}
 
             {/* Umbral vertical (SNCS) */}
             {txIn && (

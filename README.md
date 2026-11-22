@@ -10,6 +10,7 @@ Aplicación web interactiva basada en el gráfico de la sección *3.3. Resultado
   - la *cola izquierda* exige p25 ≤ umbral horizontal y, si está activado, desviación estándar ≥ umbral;
   - T2 + T4 forman la señal de alerta.
 - **Cuartiles del estudio.** Por defecto los umbrales son SNCS = 1, Q1(p25) y Q3(desviación), recalculados para el mínimo de publicaciones elegido. Al arrastrar una línea se pasa a umbrales manuales.
+- **Buscador de proyectos.** Busca por referencia (al instante, en los datos ya cargados) y por título o resumen (en MongoDB, vía `/api/search`). Todas las palabras deben aparecer. Al hacer clic en un resultado, el gráfico hace zoom hasta el proyecto, lo señala y abre su panel de detalle. Si el filtro actual lo ocultaba, se ajusta el mínimo de publicaciones o el área y se avisa.
 - **Filtros.** Mínimo de publicaciones (1 = todos los proyectos) y área científica.
 - **Zoom y desplazamiento.** Rueda del ratón o botones `+`, `−` y `⟲`; arrastrar el fondo desplaza la vista.
 - **Detalle del proyecto.** Al pasar por encima de un punto se ve su referencia. Al hacer clic se abre un panel con:
