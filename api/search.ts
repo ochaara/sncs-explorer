@@ -1,8 +1,9 @@
 /**
  * GET /api/search?q=TEXTO
  *
- * Busca proyectos en MongoDB cuya referencia, título o resumen contengan
- * todas las palabras de la consulta (sin distinguir mayúsculas).
+ * Busca proyectos en MongoDB cuyo título o resumen contengan todas las palabras
+ * de la consulta, con el índice de texto (sin distinguir mayúsculas, ordenados por
+ * relevancia). La búsqueda por referencia se hace en el navegador.
  * Devuelve como máximo LIMIT resultados, con un fragmento del resumen.
  */
 import type { IncomingMessage, ServerResponse } from 'node:http';
@@ -66,27 +67,34 @@ export async function searchProjects(query: string): Promise<SearchResponse> {
     .slice(0, 6);
   if (!terms.length) return { query, results: [], hasMore: false };
 
-  const filter = {
-    $and: terms.map((t) => {
-      const re = { $regex: escapeRegex(t), $options: 'i' };
-      return { $or: [{ Referencia: re }, { Título_EN: re }, { Resumen_EN: re }] };
-    }),
-  };
-
   const db = (await getClient()).db();
-  const docs = await db
-    .collection<ProjectDoc>('proyectos')
-    .find(filter, { projection: { _id: 0, Referencia: 1, Título_EN: 1, Resumen_EN: 1 }, maxTimeMS: 15000 })
-    .limit(LIMIT + 1)
-    .toArray();
+  const col = db.collection<ProjectDoc>('proyectos');
+  const projection = { _id: 0, Referencia: 1, Título_EN: 1, Resumen_EN: 1 };
 
-  // Primero los que coinciden en la referencia o en el título
-  const score = (d: ProjectDoc) => {
-    const title = (d.Título_EN ?? '').toLowerCase();
-    const ref = d.Referencia.toLowerCase();
-    return terms.reduce((s, t) => s + (ref.includes(t.toLowerCase()) ? 3 : 0) + (title.includes(t.toLowerCase()) ? 2 : 0), 0);
-  };
-  const ranked = docs.slice(0, LIMIT).sort((a, b) => score(b) - score(a));
+  // Índice de texto "texto_titulo_resumen" (título con peso 3, resumen con peso 1).
+  // Cada palabra va entre comillas para exigir que aparezcan todas; se ordena por relevancia.
+  let docs: ProjectDoc[];
+  try {
+    docs = await col
+      .find(
+        { $text: { $search: terms.map((t) => `"${t.replace(/"/g, '')}"`).join(' ') } },
+        { projection: { ...projection, score: { $meta: 'textScore' } }, maxTimeMS: 15000 },
+      )
+      .sort({ score: { $meta: 'textScore' } })
+      .limit(LIMIT + 1)
+      .toArray();
+  } catch (err) {
+    // Sin índice de texto (code 27, IndexNotFound): búsqueda por expresiones regulares, más lenta
+    if ((err as { code?: number }).code !== 27) throw err;
+    const filter = {
+      $and: terms.map((t) => {
+        const re = { $regex: escapeRegex(t), $options: 'i' };
+        return { $or: [{ Referencia: re }, { Título_EN: re }, { Resumen_EN: re }] };
+      }),
+    };
+    docs = await col.find(filter, { projection, maxTimeMS: 15000 }).limit(LIMIT + 1).toArray();
+  }
+  const ranked = docs.slice(0, LIMIT);
 
   return {
     query,

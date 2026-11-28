@@ -10,7 +10,7 @@ Aplicación web interactiva basada en el gráfico de la sección *3.3. Resultado
   - la *cola izquierda* exige p25 ≤ umbral horizontal y, si está activado, desviación estándar ≥ umbral;
   - T2 + T4 forman la señal de alerta.
 - **Cuartiles del estudio.** Por defecto los umbrales son SNCS = 1, Q1(p25) y Q3(desviación), recalculados para el mínimo de publicaciones elegido. Al arrastrar una línea se pasa a umbrales manuales.
-- **Buscador de proyectos.** Busca por referencia (al instante, en los datos ya cargados) y por título o resumen (en MongoDB, vía `/api/search`). Todas las palabras deben aparecer. Al hacer clic en un resultado, el gráfico hace zoom hasta el proyecto, lo señala y abre su panel de detalle. Si el filtro actual lo ocultaba, se ajusta el mínimo de publicaciones o el área y se avisa.
+- **Buscador de proyectos.** Busca por referencia (al instante, en los datos ya cargados) y por título o resumen (en MongoDB, vía `/api/search`, con el índice de texto `texto_titulo_resumen`). Todas las palabras deben aparecer, se reconocen variantes de una palabra (p. ej. *learn* encuentra *learning*) y los resultados se ordenan por relevancia, con más peso para el título. Si el índice no existe, se usa una búsqueda por expresiones regulares, más lenta. Al hacer clic en un resultado, el gráfico hace zoom hasta el proyecto, lo señala y abre su panel de detalle. Si el filtro actual lo ocultaba, se ajusta el mínimo de publicaciones o el área y se avisa.
 - **Filtros.** Mínimo de publicaciones (1 = todos los proyectos) y área científica.
 - **Zoom y desplazamiento.** Rueda del ratón o botones `+`, `−` y `⟲`; arrastrar el fondo desplaza la vista.
 - **Detalle del proyecto.** Al pasar por encima de un punto se ve su referencia. Al hacer clic se abre un panel con:
@@ -22,7 +22,7 @@ Aplicación web interactiva basada en el gráfico de la sección *3.3. Resultado
 
   Estos textos se leen de MongoDB a través de la API `/api/project`.
 
-Con un mínimo de 3 publicaciones y los cuartiles del estudio, la app reproduce los resultados del notebook: T1 8 438, T2 73, T3 7 739, T4 1 721 (1 794 alertas).
+Con un mínimo de 3 publicaciones y los cuartiles del estudio (Q1(p25) = 0,808, Q3(desviación) = 0,166), la app da: T1 8 442, T2 71, T3 7 811, T4 1 647 (1 718 alertas, 9,6 %). Son los datos con los resúmenes retraducidos (Drive `1acptFJwyNoVOVCeoWVE9Y5VLy_Vf0D-P`).
 
 ## Tecnología
 
@@ -72,12 +72,30 @@ Antes del primer despliegue:
 
 1. **Variable de entorno:** en Vercel, ve a *Project → Settings → Environment Variables* y añade `MONGODB_URI` en *Production* y *Preview*. Si el proyecto ya estaba desplegado, vuelve a desplegarlo para que la recoja.
 2. **Acceso de red en MongoDB Atlas:** las funciones de Vercel no tienen IP fija. En Atlas, ve a *Network Access → Add IP Address* y permite `0.0.0.0/0`, protegido por usuario y contraseña. Usa un usuario de base de datos **solo de lectura** sobre `proyectos`.
-3. **Índice (recomendado):** acelera la búsqueda por referencia:
+3. **Índices** (ya creados en Atlas):
    ```js
-   db.proyectos.createIndex({ Referencia: 1 })
+   db.proyectos.createIndex({ Referencia: 1 }, { name: 'referencia_1' })
+   db.proyectos.createIndex(
+     { Título_EN: 'text', Resumen_EN: 'text' },
+     { name: 'texto_titulo_resumen', weights: { Título_EN: 3, Resumen_EN: 1 }, default_language: 'english' },
+   )
    ```
+   El índice de texto ocupa unos 80 MB, a tener en cuenta en el plan gratuito de 512 MB.
 
 - **Desde Git:** sube el repositorio a GitHub, GitLab o Bitbucket y en Vercel elige *Add New → Project* e impórtalo.
 - **Desde la terminal:** `npx vercel` (vista previa) y `npx vercel --prod` (producción).
 
 El sitio desplegado es público salvo que se active la protección de despliegues de Vercel, y `projects.json` es accesible para cualquiera con la URL.
+
+## Actualizar los textos en Atlas
+
+`scripts/sync_atlas.mjs` copia `Título_EN` y `Resumen_EN` de la MongoDB local a Atlas, emparejando por `_id`. Solo cambia esos campos y nunca sobrescribe con un texto vacío.
+
+```bash
+export MONGODB_URI=...   # Atlas
+export LOCAL_URI=...     # MongoDB local
+node scripts/sync_atlas.mjs           # simulación
+node scripts/sync_atlas.mjs --apply   # aplica los cambios
+```
+
+Comprueba antes el espacio libre en Atlas: el plan gratuito permite 512 MB para todo el clúster. Después vuelve a desplegar en Vercel para vaciar la caché de `/api/project`.
